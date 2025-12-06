@@ -1,0 +1,16 @@
+# Environment & local data
+core-bot/.env
+core-bot/tournament_bot_core.db
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+core-bot/__pycache__/
+core-bot/cogs/__pycache__/
+core-bot/config/__pycache__/
+core-bot/migrations/__pycache__/
+core-bot/services/__pycache__/
+core-bot/tests/__pycache__/
+core-bot/ui/__pycache__/
+core-bot/utils/__pycache__/
