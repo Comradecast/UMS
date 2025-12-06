@@ -38,34 +38,23 @@ from database import (
 # Fixtures
 # -----------------------------------------------------------------------------
 
-
-@pytest.fixture
-def event_loop():
-    """Create event loop for async tests."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+# NOTE: With `asyncio_mode = auto` in pytest.ini, pytest-asyncio manages the
+# event loop automatically. Do NOT define a custom event_loop fixture here.
 
 
 @pytest.fixture
 async def test_db():
     """Create an in-memory test database."""
+    # Use a single connection - :memory: DBs are per-connection
     db = await aiosqlite.connect(":memory:")
     db.row_factory = aiosqlite.Row
 
-    # Initialize schema in memory
-    reset_db_init_flag()
-    await init_db(":memory:")
-
-    # Re-connect to preserve data
-    db = await aiosqlite.connect(":memory:")
-    db.row_factory = aiosqlite.Row
-
-    # Re-create tables in this specific connection
+    # Create tables directly in this connection
     await _create_test_tables(db)
 
     yield db
 
+    # Ensure connection is closed to prevent hang
     await db.close()
 
 
@@ -317,6 +306,229 @@ class TestGuildConfig:
 
         config = await service.get(111111)
         assert config.admin_channel == 999
+
+
+# -----------------------------------------------------------------------------
+# Test: Factory Reset
+# -----------------------------------------------------------------------------
+
+
+class TestFactoryReset:
+    """Test factory reset behavior."""
+
+    @pytest.mark.asyncio
+    async def test_factory_reset_clears_guild_config(self, test_db):
+        """Factory reset should remove guild config."""
+        from services.guild_config_service import GuildConfigService
+
+        service = GuildConfigService(test_db)
+        guild_id = 999888777
+
+        # Create a config
+        await service.create(
+            guild_id=guild_id,
+            admin_channel=123,
+            announce_channel=456,
+            admin_channel_created=True,
+        )
+        await service.mark_setup_complete(guild_id)
+
+        # Verify it exists
+        config = await service.get(guild_id)
+        assert config is not None
+        assert config.is_setup is True
+
+        # Delete (factory reset for config)
+        result = await service.delete(guild_id)
+        assert result is True
+
+        # Verify it's gone
+        config = await service.get(guild_id)
+        assert config is None
+
+    @pytest.mark.asyncio
+    async def test_factory_reset_allows_fresh_setup(self, test_db):
+        """After factory reset, setup should work like fresh install."""
+        from services.guild_config_service import GuildConfigService
+
+        service = GuildConfigService(test_db)
+        guild_id = 999888777
+
+        # Create, then delete
+        await service.create(guild_id=guild_id, admin_channel=123)
+        await service.delete(guild_id)
+
+        # Re-create (fresh setup)
+        new_config = await service.create(
+            guild_id=guild_id,
+            admin_channel=999,
+            announce_channel=888,
+        )
+
+        assert new_config is not None
+        assert new_config.admin_channel == 999
+        assert new_config.announce_channel == 888
+
+
+# -----------------------------------------------------------------------------
+# Test: Tournament Lifecycle
+# -----------------------------------------------------------------------------
+
+
+class TestTournamentLifecycle:
+    """Test basic tournament lifecycle at service level."""
+
+    @pytest.fixture
+    async def tournament_db(self, test_db):
+        """Create additional tables needed for tournament tests."""
+        # Add tournaments table
+        await test_db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tournaments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                format TEXT DEFAULT '1v1',
+                size INTEGER DEFAULT 8,
+                status TEXT DEFAULT 'draft',
+                tournament_code TEXT,
+                reg_message_id INTEGER,
+                reg_channel_id INTEGER,
+                allowed_regions TEXT,
+                allowed_ranks TEXT,
+                dashboard_channel_id INTEGER,
+                dashboard_message_id INTEGER,
+                created_at INTEGER
+            )
+        """
+        )
+
+        # Add tournament_entries table
+        await test_db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tournament_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tournament_id INTEGER NOT NULL,
+                player1_id INTEGER NOT NULL,
+                player2_id INTEGER,
+                team_name TEXT,
+                seed INTEGER,
+                created_at INTEGER,
+                FOREIGN KEY (tournament_id) REFERENCES tournaments(id)
+            )
+        """
+        )
+
+        # Add matches table
+        await test_db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS matches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tournament_id INTEGER NOT NULL,
+                round INTEGER NOT NULL,
+                match_index INTEGER NOT NULL,
+                entry1_id INTEGER,
+                entry2_id INTEGER,
+                winner_entry_id INTEGER,
+                score_text TEXT,
+                status TEXT DEFAULT 'pending',
+                pending_winner_entry_id INTEGER,
+                pending_reported_by INTEGER,
+                FOREIGN KEY (tournament_id) REFERENCES tournaments(id)
+            )
+        """
+        )
+
+        await test_db.commit()
+        return test_db
+
+    @pytest.mark.asyncio
+    async def test_create_tournament(self, tournament_db):
+        """Should create a tournament with draft status."""
+        from services.tournament_service import TournamentService
+
+        service = TournamentService(tournament_db)
+        guild_id = 111222333001  # Unique guild ID for this test
+
+        tournament, error = await service.create_tournament(
+            guild_id=guild_id,
+            name="Test Cup",
+            format="1v1",
+            size=8,
+        )
+
+        assert error is None
+        assert tournament is not None
+        assert tournament.name == "Test Cup"
+        assert tournament.status == "draft"
+        assert tournament.guild_id == guild_id
+
+    @pytest.mark.asyncio
+    async def test_tournament_status_transitions(self, tournament_db):
+        """Should allow valid status transitions."""
+        from services.tournament_service import TournamentService
+
+        service = TournamentService(tournament_db)
+
+        # Create tournament with unique guild ID
+        tournament, err = await service.create_tournament(
+            guild_id=111222333002,  # Unique guild ID for this test
+            name="Status Test",
+            format="1v1",
+            size=8,  # Must be 8, 16, 32, or 64
+        )
+
+        # Verify creation succeeded before testing status transitions
+        assert tournament is not None, f"Tournament creation failed: {err}"
+
+        # Draft -> reg_open
+        result = await service.set_status(tournament.id, "reg_open")
+        assert result is True
+
+        # reg_open -> reg_closed
+        result = await service.set_status(tournament.id, "reg_closed")
+        assert result is True
+
+        # reg_closed -> in_progress
+        result = await service.set_status(tournament.id, "in_progress")
+        assert result is True
+
+        # in_progress -> completed
+        result = await service.set_status(tournament.id, "completed")
+        assert result is True
+
+        # Verify final status
+        updated = await service.get_by_id(tournament.id)
+        assert updated.status == "completed"
+
+    @pytest.mark.asyncio
+    async def test_one_active_tournament_per_guild(self, tournament_db):
+        """Should enforce one active tournament per guild."""
+        from services.tournament_service import TournamentService
+
+        service = TournamentService(tournament_db)
+        guild_id = 111222333003  # Unique guild ID for this test
+
+        # Create first tournament
+        t1, error1 = await service.create_tournament(
+            guild_id=guild_id,
+            name="First Cup",
+            format="1v1",
+            size=8,
+        )
+        assert t1 is not None
+        assert error1 is None
+
+        # Try to create second - should fail
+        t2, error2 = await service.create_tournament(
+            guild_id=guild_id,
+            name="Second Cup",
+            format="1v1",
+            size=8,
+        )
+        assert t2 is None
+        assert error2 is not None
+        assert "active tournament" in error2.lower()
 
 
 # -----------------------------------------------------------------------------

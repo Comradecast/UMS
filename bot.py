@@ -4,7 +4,7 @@ core-bot/bot.py — UMS Bot Core Entry Point
 Hardened startup sequence with pre-flight checks,
 lockfile handling, and clean shutdown.
 
-UMS Core v1.0.0-beta - 3 Hero Features Only:
+UMS Core v1.0.0-core - 3 Hero Features Only:
 1. Onboarding Panel
 2. Admin Setup Panel
 3. Tournament Request Flow (approval-required)
@@ -92,7 +92,7 @@ class CoreBot(commands.Bot):
         Fails fast with clear errors if anything is missing.
         """
         print("\n" + "=" * 60)
-        print(">> UMS Bot Core — Pre-flight Checks (v1.0.0-beta)")
+        print(">> UMS Bot Core — Pre-flight Checks (v1.0.0-core)")
         print("=" * 60)
 
         # 1. Validate DISCORD_TOKEN
@@ -248,6 +248,13 @@ async def on_ready():
     print("\n" + "-" * 60)
     print("[+] UMS BOT CORE IS FULLY ONLINE")
     print("-" * 60 + "\n")
+
+    # Set presence to point people at /ums-help
+    try:
+        await bot.change_presence(activity=discord.Game(name="/ums-help for info"))
+        log.info("Bot presence set: Playing /ums-help for info")
+    except Exception as e:
+        log.warning(f"Failed to set presence: {e}")
 
 
 # -----------------------------------------------------------------------------

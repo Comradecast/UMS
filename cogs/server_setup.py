@@ -24,6 +24,17 @@ log = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
+# HELPER: Permission Check
+# -----------------------------------------------------------------------------
+
+
+def _bot_can_send(channel: discord.abc.GuildChannel, me: discord.Member) -> bool:
+    """Check if bot can view and send in a channel."""
+    perms = channel.permissions_for(me)
+    return perms.view_channel and perms.send_messages
+
+
+# -----------------------------------------------------------------------------
 # HELPER: Post Onboarding Panel
 # -----------------------------------------------------------------------------
 
@@ -136,23 +147,57 @@ class SetupWizardView(ui.View):
                 category = await guild.create_category("UMS Core")
                 status_lines.append("📁 Created **UMS Core** category")
 
-            # 2. Admin channel (private)
+            # 2. Admin channel (private) - ensure bot can post
             admin_ch, created = await find_or_create_channel(
                 guild,
                 ["ums-admin", "tournament-admin", "admin"],
                 "ums-admin",
                 category,
             )
+
+            # Check if bot can send in this channel
+            if not _bot_can_send(admin_ch, guild.me):
+                if created:
+                    # We just created it but still can't send - set permissions
+                    await admin_ch.set_permissions(
+                        guild.me,
+                        view_channel=True,
+                        send_messages=True,
+                        manage_messages=True,
+                    )
+                else:
+                    # Found existing but can't use it - create a new one
+                    log.warning(
+                        f"[SETUP] Cannot use existing {admin_ch.name}, creating new #ums-admin"
+                    )
+                    admin_ch = await guild.create_text_channel(
+                        "ums-admin",
+                        category=category,
+                        overwrites={
+                            guild.default_role: discord.PermissionOverwrite(
+                                view_channel=False
+                            ),
+                            guild.me: discord.PermissionOverwrite(
+                                view_channel=True,
+                                send_messages=True,
+                                manage_messages=True,
+                            ),
+                        },
+                    )
+                    created = True
+
             created_flags["admin"] = created
             if created:
+                # Ensure private + bot access for newly created channels
                 await admin_ch.set_permissions(
                     guild.default_role,
                     read_messages=False,
                 )
                 await admin_ch.set_permissions(
                     guild.me,
-                    read_messages=True,
+                    view_channel=True,
                     send_messages=True,
+                    manage_messages=True,
                 )
                 status_lines.append(f"🔒 Created {admin_ch.mention} (private)")
             else:
@@ -209,22 +254,52 @@ class SetupWizardView(ui.View):
             else:
                 status_lines.append(f"\n⚠️ Failed to post onboarding panel")
 
-            # 7. Post admin control panel to admin channel
+            # 7. Post admin control panel to admin channel (graceful on failure)
             from cogs.tournaments import post_admin_panel
 
-            admin_panel_ok = await post_admin_panel(self.cog.bot, admin_ch)
+            admin_panel_posted = False
+            admin_panel_warning = None
 
-            if admin_panel_ok:
-                status_lines.append(
-                    f"✅ Tournament control panel posted in {admin_ch.mention}"
+            # Check permissions before trying
+            if not _bot_can_send(admin_ch, guild.me):
+                admin_panel_warning = (
+                    f"⚠️ Cannot post to {admin_ch.mention} (missing permissions)"
+                )
+                log.warning(
+                    f"[SETUP] Bot lacks permission to send in admin channel {admin_ch.id}"
                 )
             else:
-                # Fallback to text if panel fails
-                await admin_ch.send(
-                    "**🎉 UMS Bot Core is ready!**\n\n"
-                    "This channel will receive admin notifications.\n\n"
-                    "Use `/tournament_create` to start a tournament."
-                )
+                try:
+                    admin_panel_ok = await post_admin_panel(self.cog.bot, admin_ch)
+                    if admin_panel_ok:
+                        admin_panel_posted = True
+                        status_lines.append(
+                            f"✅ Tournament control panel posted in {admin_ch.mention}"
+                        )
+                    else:
+                        # post_admin_panel returned False - try simple fallback
+                        await admin_ch.send(
+                            "**🎉 UMS Bot Core is ready!**\n\n"
+                            "This channel will receive admin notifications.\n\n"
+                            "Use `/tournament_create` to start a tournament."
+                        )
+                        admin_panel_posted = True
+                        status_lines.append(
+                            f"✅ Welcome message posted in {admin_ch.mention}"
+                        )
+                except discord.Forbidden:
+                    admin_panel_warning = (
+                        f"⚠️ Could not post to {admin_ch.mention} (access denied)"
+                    )
+                    log.warning(
+                        f"[SETUP] Forbidden when posting to admin channel {admin_ch.id}"
+                    )
+                except Exception as e:
+                    admin_panel_warning = f"⚠️ Error posting to {admin_ch.mention}: {e}"
+                    log.error(f"[SETUP] Error posting admin panel: {e}")
+
+            if admin_panel_warning:
+                status_lines.append(admin_panel_warning)
 
             # 8. Send summary
             embed = discord.Embed(
@@ -732,7 +807,7 @@ class ServerSetup(commands.Cog):
                 inline=False,
             )
 
-        embed.set_footer(text="UMS Bot Core v1.0.0-beta")
+        embed.set_footer(text="UMS Bot Core v1.0.0-core")
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -871,7 +946,7 @@ class FactoryResetConfirmView(ui.View):
             for item in self.children:
                 item.disabled = True
 
-            # Update message
+            # Update message - may fail if channel was deleted
             embed = discord.Embed(
                 title="✅ Factory Reset Complete",
                 description=(
@@ -882,7 +957,13 @@ class FactoryResetConfirmView(ui.View):
                 color=discord.Color.green(),
             )
 
-            await interaction.edit_original_response(embed=embed, view=self)
+            try:
+                await interaction.edit_original_response(embed=embed, view=self)
+            except (discord.NotFound, discord.HTTPException):
+                # Channel or message was deleted - that's fine, reset succeeded
+                log.info(
+                    "[FACTORY-RESET] Could not edit response (channel likely deleted)"
+                )
 
             # Try to DM the admin
             try:
@@ -895,7 +976,17 @@ class FactoryResetConfirmView(ui.View):
 
         except Exception as e:
             log.error(f"[FACTORY-RESET] Error: {e}", exc_info=True)
-            await interaction.followup.send(f"❌ Reset failed: {e}", ephemeral=True)
+            # Try to notify user - may fail if channel deleted
+            try:
+                await interaction.followup.send(f"❌ Reset failed: {e}", ephemeral=True)
+            except (discord.NotFound, discord.HTTPException):
+                # Can't send - try DM
+                try:
+                    await interaction.user.send(
+                        f"❌ Factory Reset failed for **{guild.name}**: {e}"
+                    )
+                except discord.Forbidden:
+                    pass
 
     @ui.button(
         label="Cancel",

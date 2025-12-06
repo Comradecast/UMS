@@ -30,7 +30,7 @@ log = logging.getLogger(__name__)
 # Core bot uses its own database file
 DB_NAME = os.getenv("CORE_BOT_DB", "tournament_bot_core.db")
 
-SCHEMA_VERSION = 4  # UMS Core v1.0.0-beta
+SCHEMA_VERSION = 4  # UMS Core v1.0.0-core
 
 # Idempotency flag
 _db_initialized = False
