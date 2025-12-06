@@ -37,7 +37,8 @@ This Code of Conduct applies within all community spaces, and also applies when 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be reported via:
 
 * GitHub Issues (for non-sensitive matters)
-* Email: contact@ums-bot.example (for private reports)
+* Email: xj9q2r7m5b1v8n4k6t0y3p8l2s9w1a@gmail.com
+ (for private reports)
 
 All complaints will be reviewed and investigated promptly and fairly.
 
