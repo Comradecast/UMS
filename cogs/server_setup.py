@@ -22,6 +22,17 @@ from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
+# Import version constant and brand kit
+from core_version import CORE_VERSION
+from ui.brand import (
+    Colors,
+    FOOTER_TEXT,
+    create_embed,
+    success_embed,
+    error_embed,
+    warning_embed,
+)
+
 
 # -----------------------------------------------------------------------------
 # HELPER: Permission Check
@@ -302,13 +313,9 @@ class SetupWizardView(ui.View):
                 status_lines.append(admin_panel_warning)
 
             # 8. Send summary
-            embed = discord.Embed(
-                title="✅ Quick Setup Complete",
-                description="\n".join(status_lines),
-                color=discord.Color.green(),
-            )
+            embed = success_embed("Quick Setup Complete", "\n".join(status_lines))
             embed.add_field(
-                name="📁 Configuration Summary",
+                name="Configuration Summary",
                 value=(
                     f"**Admin notifications**: {admin_ch.mention}\n"
                     f"**Announcements**: {announce_ch.mention}\n"
@@ -348,15 +355,21 @@ class SetupWizardView(ui.View):
 
         await interaction.response.defer(ephemeral=True)
 
-        embed = discord.Embed(
-            title="📂 Select Channels for UMS Bot Core",
-            description=(
-                "Select a channel for each purpose:\n\n"
-                "• **Admin Channel** — Where admins receive notifications\n"
-                "• **Announcement Channel** — Where tournament updates are posted\n"
-                "• **Onboarding Channel** — Where the player registration panel will be posted"
-            ),
-            color=discord.Color.blue(),
+        embed = create_embed("Select Channels", "Select a channel for each purpose.")
+        embed.add_field(
+            name="Admin Channel",
+            value="Where admins receive notifications",
+            inline=False,
+        )
+        embed.add_field(
+            name="Announcement Channel",
+            value="Where tournament updates are posted",
+            inline=False,
+        )
+        embed.add_field(
+            name="Onboarding Channel",
+            value="Where the player registration panel will be posted",
+            inline=False,
         )
 
         view = ChannelSelectionView(self.cog)
@@ -620,27 +633,27 @@ class ServerSetup(commands.Cog):
             return await interaction.response.send_message(embed=embed, ephemeral=True)
 
         # Show wizard
-        embed = discord.Embed(
-            title="🧙 UMS Bot Core Setup",
-            description=(
-                "**Welcome to UMS Bot Core!**\n\n"
-                "This wizard will configure your server for tournaments.\n\n"
-                "**What we'll set up:**\n"
-                "• Admin channel for notifications\n"
-                "• Announcement channel for tournament updates\n"
-                "• Onboarding panel for player registration\n\n"
-                "Choose your setup method:"
-            ),
-            color=discord.Color.blue(),
+        embed = create_embed(
+            "UMS Bot Core Setup",
+            "This wizard will configure your server for tournaments.",
         )
         embed.add_field(
-            name="🧙 Quick Setup (Recommended)",
-            value="Auto-detect existing channels or create new ones. Onboarding panel posted automatically.",
+            name="What we'll set up",
+            value=(
+                "• Admin channel for notifications\n"
+                "• Announcement channel for tournament updates\n"
+                "• Onboarding panel for player registration"
+            ),
             inline=False,
         )
         embed.add_field(
-            name="📂 Use Existing Channels",
-            value="Manually select which channels to use for each purpose.",
+            name="Quick Setup (Recommended)",
+            value="Auto-detect existing channels or create new ones.",
+            inline=False,
+        )
+        embed.add_field(
+            name="Use Existing Channels",
+            value="Manually select which channels to use.",
             inline=False,
         )
 
@@ -672,11 +685,13 @@ class ServerSetup(commands.Cog):
                 ephemeral=True,
             )
 
+        color = Colors.SUCCESS if config.is_setup else Colors.WARNING
         embed = discord.Embed(
-            title="⚙️ UMS Bot Core Configuration",
+            title="Server Configuration",
             description=f"Configuration for **{interaction.guild.name}**",
-            color=discord.Color.green() if config.is_setup else discord.Color.orange(),
+            color=color,
         )
+        embed.set_footer(text=FOOTER_TEXT)
 
         # Channels
         channels = []
@@ -768,48 +783,111 @@ class ServerSetup(commands.Cog):
             else False
         )
 
-        embed = discord.Embed(
-            title="🎮 UMS Bot Core Help",
-            description="Welcome to UMS Bot Core — a lightweight Single Elimination tournament bot.",
-            color=discord.Color.blue(),
+        embed = create_embed(
+            "UMS Bot Core Help",
+            "A lightweight Single Elimination tournament bot.\nOne active tournament per guild. Direct creation, no approval workflow.",
         )
 
         # Player section
         embed.add_field(
-            name="👤 For Players",
+            name="For Players",
             value=(
-                "• Use the **Onboarding Panel** to register (set region & rank)\n"
-                "• Wait for admins to create and open tournament registration"
+                "• Click **Start Onboarding** on the panel to register\n"
+                "• Set your region and rank (one-time setup)\n"
+                "• Wait for admins to open tournament registration"
             ),
             inline=False,
         )
 
         if is_admin:
             embed.add_field(
-                name="🛠️ Admin Commands",
+                name="Setup & Admin",
                 value=(
-                    "`/setup` — Configure UMS Bot Core (wizard)\n"
+                    "`/setup` — Configure UMS Bot Core\n"
                     "`/config` — View current configuration\n"
-                    "`/post_onboarding_panel` — Post onboarding panel"
+                    "`/admin_reset_player` — Reset a player's onboarding\n"
+                    "`/ums_factory_reset` — Wipe all bot data (destructive)"
                 ),
                 inline=False,
             )
 
             embed.add_field(
-                name="🏆 Tournament Commands (Coming Soon)",
+                name="Tournament Commands",
                 value=(
                     "`/tournament_create` — Create a tournament\n"
                     "`/tournament_open_registration` — Open signups\n"
                     "`/tournament_close_registration` — Close signups\n"
                     "`/tournament_start` — Generate bracket\n"
-                    "`/tournament_report_result` — Record results"
+                    "`/ums_report_result` — Record match results"
                 ),
                 inline=False,
             )
 
-        embed.set_footer(text="UMS Bot Core v1.0.0-core")
-
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    # -------------------------------------------------------------------------
+    # /admin_reset_player
+    # -------------------------------------------------------------------------
+
+    @app_commands.command(
+        name="admin_reset_player",
+        description="Reset a player's onboarding so they can re-register (Admin only)",
+    )
+    @app_commands.guild_only()
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(user="The player to reset")
+    async def admin_reset_player(
+        self,
+        interaction: discord.Interaction,
+        user: discord.Member,
+    ):
+        """Reset a player's onboarding status."""
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.response.send_message(
+                "❌ Only server admins can reset player profiles.",
+                ephemeral=True,
+            )
+
+        await interaction.response.defer(ephemeral=True)
+
+        # Check if player service is available
+        if not hasattr(self.bot, "player_service"):
+            return await interaction.followup.send(
+                "❌ Player service unavailable.",
+                ephemeral=True,
+            )
+
+        # Check if player exists
+        player = await self.bot.player_service.get_by_discord_id(user.id)
+        if not player:
+            return await interaction.followup.send(
+                f"❌ {user.mention} has no UMS profile to reset.",
+                ephemeral=True,
+            )
+
+        if not player.has_onboarded:
+            return await interaction.followup.send(
+                f"ℹ️ {user.mention} hasn't completed onboarding yet.",
+                ephemeral=True,
+            )
+
+        # Reset onboarding
+        success = await self.bot.player_service.reset_onboarding(user.id)
+
+        if success:
+            log.info(
+                f"[ADMIN] {interaction.user} reset onboarding for {user} ({user.id})"
+            )
+            await interaction.followup.send(
+                f"✅ Reset onboarding for {user.mention}.\n\n"
+                f"They can now click **Start Onboarding** again to set their region and rank.",
+                ephemeral=True,
+            )
+        else:
+            await interaction.followup.send(
+                f"❌ Failed to reset {user.mention}'s profile. Check logs.",
+                ephemeral=True,
+            )
 
     # -------------------------------------------------------------------------
     # /ums_factory_reset
@@ -833,19 +911,21 @@ class ServerSetup(commands.Cog):
             )
 
         embed = discord.Embed(
-            title="⚠️ Factory Reset UMS Bot Core",
+            title="Factory Reset",
             description=(
                 "**This will:**\n"
-                "• Delete UMS-related channels (only those created by the bot)\n"
-                "• Remove all stored data for this server\n"
-                "• Remove tournaments, matches, entries\n"
-                "• Remove player data\n"
-                "• Remove your setup state\n\n"
-                "**Are you sure?**"
+                "\u2022 Delete UMS-related channels (only those created by the bot)\n"
+                "\u2022 Remove all stored data for this server\n"
+                "\u2022 Remove tournaments, matches, entries\n"
+                "\u2022 Remove player data\n"
+                "\u2022 Remove your setup state"
             ),
-            color=discord.Color.red(),
+            color=Colors.ERROR,
         )
-        embed.set_footer(text="This action cannot be undone!")
+        embed.add_field(
+            name="Warning", value="This action cannot be undone.", inline=False
+        )
+        embed.set_footer(text=FOOTER_TEXT)
 
         view = FactoryResetConfirmView(self)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)

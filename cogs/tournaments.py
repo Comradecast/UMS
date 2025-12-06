@@ -7,8 +7,8 @@ Commands:
 - /tournament_create - Create a new tournament
 - /tournament_open_registration - Open registration
 - /tournament_close_registration - Close registration
-- /tournament_start - Generate bracket and start (coming soon)
-- /tournament_report_result - Record match result (coming soon)
+- /tournament_start - Generate bracket and start
+- /ums_report_result - Record match results
 - /tournament_cancel - Cancel tournament
 """
 
@@ -32,6 +32,7 @@ from ui.registration_views import (
     Registration1v1View,
     Registration2v2View,
 )
+from ui.brand import Colors, FOOTER_TEXT, create_embed, success_embed, error_embed
 
 log = logging.getLogger(__name__)
 
@@ -266,20 +267,21 @@ async def update_tournament_dashboard(
 async def post_admin_panel(bot: commands.Bot, channel: discord.TextChannel) -> bool:
     """Post the admin control panel to a channel."""
     try:
-        embed = discord.Embed(
-            title="🎮 UMS Tournament Control Panel",
-            description=(
-                "Manage tournaments with one click!\n\n"
-                "**Workflow:**\n"
-                "1️⃣ Create Tournament\n"
-                "2️⃣ Open Registration\n"
-                "3️⃣ Close Registration\n"
-                "4️⃣ Start Tournament\n"
-                "5️⃣ Report Results (coming soon)"
-            ),
-            color=discord.Color.blue(),
+        embed = create_embed(
+            "Tournament Control Panel", "Manage tournaments with the buttons below."
         )
-        embed.set_footer(text="UMS Bot Core • Only admins can use these buttons")
+        embed.add_field(
+            name="Workflow",
+            value=(
+                "1. Create Tournament\n"
+                "2. Open Registration\n"
+                "3. Close Registration\n"
+                "4. Start Tournament\n"
+                "5. Report Results"
+            ),
+            inline=False,
+        )
+        embed.set_footer(text=f"{FOOTER_TEXT} • Admin only")
 
         view = AdminControlPanel(bot)
         await channel.send(embed=embed, view=view)
@@ -372,11 +374,7 @@ class TournamentsCog(commands.Cog):
             await interaction.followup.send(f"❌ {error}", ephemeral=True)
             return
 
-        embed = discord.Embed(
-            title="✅ Tournament Created",
-            description=f"**{tournament.name}**",
-            color=discord.Color.green(),
-        )
+        embed = success_embed("Tournament Created", f"**{tournament.name}**")
         embed.add_field(name="Format", value=tournament.format, inline=True)
         embed.add_field(name="Size", value=str(tournament.size), inline=True)
         embed.add_field(name="Status", value=tournament.status, inline=True)
@@ -390,7 +388,6 @@ class TournamentsCog(commands.Cog):
             ),
             inline=False,
         )
-        embed.set_footer(text=f"Tournament ID: {tournament.id}")
 
         await interaction.followup.send(embed=embed, ephemeral=True)
 
@@ -845,76 +842,204 @@ class TournamentsCog(commands.Cog):
         )
 
     # -------------------------------------------------------------------------
-    # /ums_report_result
+    # /ums_report_result - Admin Override Wizard
     # -------------------------------------------------------------------------
 
     @app_commands.command(
         name="ums_report_result",
-        description="Report a match result (Admin only)",
-    )
-    @app_commands.describe(
-        winner="The winner of the match",
-        loser="The loser of the match",
-        score="Optional score (e.g., 2-1)",
-        tournament_id="Optional tournament ID (defaults to active)",
+        description="Override a match result (Admin only)",
     )
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
-    async def ums_report_result(
-        self,
-        interaction: discord.Interaction,
-        winner: discord.Member,
-        loser: discord.Member,
-        score: Optional[str] = None,
-        tournament_id: Optional[int] = None,
-    ):
-        """Report a match result."""
+    async def ums_report_result(self, interaction: discord.Interaction):
+        """Admin Override Wizard for match results."""
         if not interaction.user.guild_permissions.manage_guild:
-            await interaction.response.send_message(
-                "❌ You need Manage Server permission to report results.",
-                ephemeral=True,
+            embed = error_embed(
+                "Permission Denied",
+                "You need Manage Server permission to override results.",
             )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
 
-        # Report result
-        tournament, match, error = await self.tournament_service.report_result(
-            guild_id=interaction.guild.id,
-            winner_id=winner.id,
-            loser_id=loser.id,
-            score=score,
-            tournament_id=tournament_id,
+        # Get active tournament for this guild
+        tournament = await self.tournament_service.get_active_for_guild(
+            interaction.guild.id
         )
 
-        if error:
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+        if not tournament:
+            embed = error_embed(
+                "No Active Tournaments", "There are no active tournaments to override."
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
-        # Build response
-        response = (
-            f"✅ **Match Result Recorded**\n\n"
-            f"**Winner:** {winner.mention}\n"
-            f"**Loser:** {loser.mention}\n"
+        if tournament.status != "in_progress":
+            embed = error_embed(
+                "Tournament Not Started",
+                f"Tournament **{tournament.name}** is in status: **{tournament.status}**\n\nStart the tournament first.",
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            return
+
+        # Get unresolved (pending) matches
+        all_matches = await self.tournament_service.list_matches(tournament.id)
+        pending_matches = [m for m in all_matches if m.status == "pending"]
+
+        if not pending_matches:
+            embed = success_embed(
+                "All Matches Resolved",
+                f"All matches in **{tournament.name}** have been completed.",
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            return
+
+        # Build match names lookup
+        match_names = {}
+        for match in pending_matches:
+            entry1_name = (
+                await self.tournament_service.get_entry_display_name(
+                    match.entry1_id, tournament.format
+                )
+                if match.entry1_id
+                else "BYE"
+            )
+            entry2_name = (
+                await self.tournament_service.get_entry_display_name(
+                    match.entry2_id, tournament.format
+                )
+                if match.entry2_id
+                else "BYE"
+            )
+            match_names[match.id] = (entry1_name, entry2_name)
+
+        # Show the override wizard
+        from ui.tournament_views import MatchOverrideView
+
+        embed = create_embed(
+            "Override Match Result",
+            f"**Tournament:** {tournament.name}\n\nSelect a match to override:",
         )
-        if score:
-            response += f"**Score:** {score}\n"
+        embed.add_field(
+            name="Pending Matches", value=str(len(pending_matches)), inline=True
+        )
 
-        response += f"\n**Match ID:** {match.id} | **Round:** {match.round}"
-
-        if tournament.status == "completed":
-            response += f"\n\n🏆 **Tournament Complete!** {winner.mention} wins!"
-
-        await interaction.followup.send(response, ephemeral=True)
+        view = MatchOverrideView(pending_matches, match_names)
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
         log.info(
-            f"[TOURNAMENT] Admin {interaction.user.id} reported result: "
-            f"winner={winner.id}, loser={loser.id}, match={match.id}"
+            f"[TOURNAMENT] Admin {interaction.user.id} opened override wizard "
+            f"for tournament {tournament.id}"
         )
 
     # -------------------------------------------------------------------------
     # DEV-ONLY COMMANDS
     # -------------------------------------------------------------------------
+
+    @app_commands.command(
+        name="ums_dev_tools",
+        description="[DEV] Open dev tools hub",
+    )
+    @app_commands.guild_only()
+    async def dev_tools_hub(self, interaction: discord.Interaction):
+        """Dev-only tools hub with quick access to all dev features."""
+        # Dev-only gate
+        if not is_dev_user(interaction.user):
+            embed = error_embed(
+                "Access Denied", "You do not have access to developer tools."
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        # Try to get active tournament for display
+        tournament = await self.tournament_service.get_active_for_guild(
+            interaction.guild.id
+        )
+
+        # Import and create hub view
+        from ui.tournament_views import DevToolsHubView
+
+        view = DevToolsHubView(self.bot, interaction.guild.id)
+        embed = view._build_embed(tournament)
+
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+
+        log.info(
+            f"[DEV] User {interaction.user.id} opened Dev Tools Hub in guild {interaction.guild.id}"
+        )
+
+    @app_commands.command(
+        name="ums_dev_bracket_tools",
+        description="[DEV] Open bracket tools panel for testing",
+    )
+    @app_commands.guild_only()
+    async def dev_bracket_tools(self, interaction: discord.Interaction):
+        """Dev-only bracket testing tools panel."""
+        # Dev-only gate
+        if not is_dev_user(interaction.user):
+            embed = error_embed(
+                "Access Denied", "This command is for development use only."
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        # Get active in-progress tournament
+        tournament = await self.tournament_service.get_active_for_guild(
+            interaction.guild.id
+        )
+
+        if not tournament:
+            embed = error_embed(
+                "No Active Tournaments",
+                "There are no active tournaments in this server.",
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            return
+
+        if tournament.status != "in_progress":
+            embed = error_embed(
+                "Tournament Not Started",
+                f"Tournament **{tournament.name}** is in status: **{tournament.status}**\n\nStart the tournament first.",
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            return
+
+        # Get match counts for initial display
+        all_matches = await self.tournament_service.list_matches(tournament.id)
+        pending = [m for m in all_matches if m.status == "pending"]
+        completed = [m for m in all_matches if m.status == "completed"]
+
+        # Import and create view
+        from ui.tournament_views import DevBracketToolsView
+
+        embed = create_embed(
+            "Dev Bracket Tools",
+            f"**Tournament:** {tournament.name}\n**Code:** `{tournament.tournament_code}`",
+        )
+        embed.add_field(name="Status", value=tournament.status, inline=True)
+        embed.add_field(name="Pending", value=str(len(pending)), inline=True)
+        embed.add_field(name="Completed", value=str(len(completed)), inline=True)
+        embed.add_field(
+            name="Actions",
+            value=(
+                "• **Advance One** — Pick and resolve a single match\n"
+                "• **Advance Round** — Resolve all matches in lowest round\n"
+                "• **Auto-resolve** — Resolve all dummy vs dummy matches"
+            ),
+            inline=False,
+        )
+
+        view = DevBracketToolsView(self.bot, tournament)
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+
+        log.info(
+            f"[DEV] User {interaction.user.id} opened bracket tools for tournament {tournament.id}"
+        )
 
     @app_commands.command(
         name="ums_dev_fill_dummies",

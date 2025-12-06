@@ -1,14 +1,13 @@
 """
-cogs/onboarding_view.py — Player Onboarding Panel
-===================================================
-UMS Bot Core - Hero Feature A: Onboarding Panel
+cogs/onboarding_view.py — Player Onboarding Panel (Option A)
+=============================================================
+UMS Bot Core - Hero Feature A: One-Shot Onboarding
 
-Provides:
-- /onboarding_panel (admin) - Posts persistent onboarding panel
-- /onboard (user) - Ephemeral onboarding UI
-- Persistent views that survive bot restarts
-
-Users select region + rank to complete their profile.
+Behavior:
+- Public panel has single "Start Onboarding" button
+- If NOT onboarded: Shows ephemeral view with Region/Rank dropdowns + Submit/Cancel
+- If already onboarded: Shows ephemeral read-only summary
+- One-shot: Users cannot change region/rank after completing (admin reset required)
 """
 
 from __future__ import annotations
@@ -19,6 +18,9 @@ from typing import Optional
 import discord
 from discord import app_commands, ui
 from discord.ext import commands
+
+# Brand kit imports
+from ui.brand import Colors, FOOTER_TEXT, create_embed, success_embed, error_embed
 
 log = logging.getLogger(__name__)
 
@@ -42,23 +44,23 @@ REGIONS = {
 REGION_CODES = list(REGIONS.keys())
 
 RANKS = [
-    ("Bronze", "🟤"),
-    ("Silver", "⚪"),
-    ("Gold", "🟡"),
-    ("Platinum", "💠"),
-    ("Diamond", "💎"),
-    ("Champion", "🏆"),
-    ("Grand Champion", "👑"),
+    ("Bronze", None),
+    ("Silver", None),
+    ("Gold", None),
+    ("Platinum", None),
+    ("Diamond", None),
+    ("Champion", None),
+    ("Grand Champion", None),
 ]
 
 
 # -----------------------------------------------------------------------------
-# Persistent Select Menus
+# Ephemeral Onboarding Session View (shown after clicking Start Onboarding)
 # -----------------------------------------------------------------------------
 
 
-class PersistentRegionSelect(ui.Select):
-    """Region selection - persistent across restarts."""
+class OnboardingRegionSelect(ui.Select):
+    """Region dropdown for ephemeral onboarding session."""
 
     def __init__(self):
         options = [
@@ -66,43 +68,151 @@ class PersistentRegionSelect(ui.Select):
             for code in REGION_CODES
         ]
         super().__init__(
-            placeholder="🌍 Select your region...",
+            placeholder="Select your region",
             options=options,
-            custom_id="ums_onboard:region",
             row=0,
         )
 
     async def callback(self, interaction: discord.Interaction):
-        view: PersistentOnboardingView = self.view
-        view.selected_region = self.values[0]
-        view._update_confirm_button()
-        await interaction.response.edit_message(view=view)
+        await interaction.response.defer()
 
 
-class PersistentRankSelect(ui.Select):
-    """Rank selection - persistent across restarts."""
+class OnboardingRankSelect(ui.Select):
+    """Rank dropdown for ephemeral onboarding session."""
 
     def __init__(self):
-        options = [
-            discord.SelectOption(label=name, value=name, emoji=emoji)
-            for name, emoji in RANKS
-        ]
+        options = [discord.SelectOption(label=name, value=name) for name, _ in RANKS]
         super().__init__(
-            placeholder="🎮 Select your current rank...",
+            placeholder="Select your rank",
             options=options,
-            custom_id="ums_onboard:rank",
             row=1,
         )
 
     async def callback(self, interaction: discord.Interaction):
-        view: PersistentOnboardingView = self.view
-        view.selected_rank = self.values[0]
-        view._update_confirm_button()
-        await interaction.response.edit_message(view=view)
+        await interaction.response.defer()
+
+
+class OnboardingSessionView(ui.View):
+    """
+    Ephemeral onboarding session view.
+
+    Shown when user clicks "Start Onboarding" and is NOT yet onboarded.
+    Contains Region/Rank dropdowns + Submit/Cancel buttons.
+    """
+
+    def __init__(self, bot: commands.Bot, user_id: int):
+        super().__init__(timeout=180)
+        self.bot = bot
+        self.user_id = user_id
+
+        self.region_select = OnboardingRegionSelect()
+        self.rank_select = OnboardingRankSelect()
+        self.add_item(self.region_select)
+        self.add_item(self.rank_select)
+
+    @ui.button(
+        label="Submit",
+        style=discord.ButtonStyle.primary,
+        row=2,
+    )
+    async def submit_button(self, interaction: discord.Interaction, button: ui.Button):
+        """Save onboarding data and show completion summary."""
+        if interaction.user.id != self.user_id:
+            embed = error_embed("Access Denied", "This is not your onboarding session.")
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        region = self.region_select.values[0] if self.region_select.values else None
+        rank = self.rank_select.values[0] if self.rank_select.values else None
+
+        if not region or not rank:
+            embed = error_embed(
+                "Selection Required", "Please select both a region and a rank."
+            )
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        if not hasattr(self.bot, "player_service"):
+            embed = error_embed(
+                "Service Unavailable", "Player service unavailable. Please try again."
+            )
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        success = await self.bot.player_service.complete_onboarding(
+            discord_id=self.user_id,
+            region=region,
+            claimed_rank=rank,
+            display_name=interaction.user.display_name,
+        )
+
+        if not success:
+            embed = error_embed(
+                "Save Failed", "Failed to save profile. Please try again."
+            )
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        for item in self.children:
+            item.disabled = True
+
+        region_display = REGIONS.get(region, region)
+        embed = success_embed(
+            "Onboarding Complete", "Your UMS profile has been created."
+        )
+        embed.add_field(name="Region", value=region_display, inline=True)
+        embed.add_field(name="Rank", value=rank, inline=True)
+        embed.add_field(
+            name="Need Changes?",
+            value="Contact a mod/admin to reset your profile.",
+            inline=False,
+        )
+
+        await interaction.response.edit_message(embed=embed, view=self)
+
+        log.info(
+            f"[ONBOARDING] User {self.user_id} completed: region={region}, rank={rank}"
+        )
+
+        if interaction.guild:
+            region_role = discord.utils.get(interaction.guild.roles, name=region)
+            if region_role:
+                try:
+                    await interaction.user.add_roles(region_role)
+                    log.info(
+                        f"[ONBOARDING] Assigned role {region} to user {self.user_id}"
+                    )
+                except discord.Forbidden:
+                    log.warning(f"[ONBOARDING] Could not assign role {region}")
+                except Exception as e:
+                    log.warning(f"[ONBOARDING] Role assignment error: {e}")
+
+    @ui.button(
+        label="Cancel",
+        style=discord.ButtonStyle.secondary,
+        row=2,
+    )
+    async def cancel_button(self, interaction: discord.Interaction, button: ui.Button):
+        """Cancel onboarding session."""
+        if interaction.user.id != self.user_id:
+            embed = error_embed("Access Denied", "This is not your onboarding session.")
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        for item in self.children:
+            item.disabled = True
+
+        embed = create_embed(
+            "Onboarding Cancelled",
+            "No changes were made to your profile.",
+            Colors.WARNING,
+        )
+
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def on_timeout(self):
+        """Handle timeout - disable all components."""
+        for item in self.children:
+            item.disabled = True
 
 
 # -----------------------------------------------------------------------------
-# Persistent Onboarding View
+# Persistent Public Panel View (single button)
 # -----------------------------------------------------------------------------
 
 
@@ -111,237 +221,61 @@ class PersistentOnboardingView(ui.View):
     Persistent onboarding panel view.
 
     Posted by admins, survives bot restarts.
+    Contains only a "Start Onboarding" button.
     """
 
     def __init__(self, bot: commands.Bot = None):
         super().__init__(timeout=None)
         self.bot = bot
-        self.selected_region: Optional[str] = None
-        self.selected_rank: Optional[str] = None
-
-        self.add_item(PersistentRegionSelect())
-        self.add_item(PersistentRankSelect())
-
-    def _update_confirm_button(self):
-        """Enable confirm button when both selections made."""
-        for item in self.children:
-            if isinstance(item, ui.Button) and item.custom_id == "ums_onboard:confirm":
-                item.disabled = not (self.selected_region and self.selected_rank)
 
     @ui.button(
-        label="✅ Complete Onboarding",
-        style=discord.ButtonStyle.success,
-        custom_id="ums_onboard:confirm",
-        disabled=True,
-        row=2,
+        label="Start Onboarding",
+        style=discord.ButtonStyle.primary,
+        custom_id="ums_core_onboarding_start",
     )
-    async def confirm_button(self, interaction: discord.Interaction, button: ui.Button):
-        """Handle onboarding confirmation."""
-        try:
-            # Get selections from component state
-            region = None
-            rank = None
+    async def start_onboarding(
+        self, interaction: discord.Interaction, button: ui.Button
+    ):
+        """Handle Start Onboarding button click."""
+        bot = interaction.client
+        user_id = interaction.user.id
 
-            if interaction.message:
-                for action_row in interaction.message.components:
-                    for component in action_row.children:
-                        if hasattr(component, "values") and component.values:
-                            if component.custom_id == "ums_onboard:region":
-                                region = component.values[0]
-                            elif component.custom_id == "ums_onboard:rank":
-                                rank = component.values[0]
+        if hasattr(bot, "player_service"):
+            player = await bot.player_service.get_by_discord_id(user_id)
 
-            # Fallback to view state
-            region = region or self.selected_region
-            rank = rank or self.selected_rank
+            if player and player.has_onboarded:
+                region_display = REGIONS.get(player.region, player.region or "Unknown")
+                rank = player.claimed_rank or "Unknown"
 
-            if not region or not rank:
+                embed = success_embed(
+                    "Already Onboarded", "Your UMS profile is already set up."
+                )
+                embed.add_field(name="Region", value=region_display, inline=True)
+                embed.add_field(name="Rank", value=rank, inline=True)
+                embed.add_field(
+                    name="Need Changes?",
+                    value="Contact a mod/admin to reset your profile.",
+                    inline=False,
+                )
+
                 return await interaction.response.send_message(
-                    "❌ Please select both region and rank.",
+                    embed=embed,
                     ephemeral=True,
                 )
 
-            await interaction.response.defer(ephemeral=True)
-
-            # Get player service from bot
-            bot = interaction.client
-            if not hasattr(bot, "player_service"):
-                return await interaction.followup.send(
-                    "❌ Player service unavailable.",
-                    ephemeral=True,
-                )
-
-            # Complete onboarding
-            success = await bot.player_service.complete_onboarding(
-                discord_id=interaction.user.id,
-                region=region,
-                claimed_rank=rank,
-                display_name=interaction.user.display_name,
-            )
-
-            if not success:
-                return await interaction.followup.send(
-                    "❌ Failed to save profile. Please try again.",
-                    ephemeral=True,
-                )
-
-            # Try to assign region role
-            role_msg = ""
-            if interaction.guild:
-                region_role = discord.utils.get(interaction.guild.roles, name=region)
-                if region_role:
-                    try:
-                        await interaction.user.add_roles(region_role)
-                        role_msg = f"\n🏷️ Region role `{region}` assigned!"
-                    except discord.Forbidden:
-                        log.warning(f"[ONBOARDING] Could not assign role {region}")
-                    except Exception as e:
-                        log.warning(f"[ONBOARDING] Role assignment error: {e}")
-
-            region_display = REGIONS.get(region, region)
-            await interaction.followup.send(
-                f"✅ **Welcome aboard!**\n\n"
-                f"🌍 **Region**: {region_display}\n"
-                f"🎮 **Starting Rank**: {rank}\n"
-                f"{role_msg}\n\n"
-                f"You're all set to join tournaments!",
-                ephemeral=True,
-            )
-
-            log.info(
-                f"[ONBOARDING] User {interaction.user.id} completed: "
-                f"region={region}, rank={rank}"
-            )
-
-        except Exception as e:
-            log.error(f"[ONBOARDING] Error: {e}", exc_info=True)
-            try:
-                await interaction.followup.send(
-                    "❌ An error occurred. Please try again.",
-                    ephemeral=True,
-                )
-            except:
-                pass
-
-
-# -----------------------------------------------------------------------------
-# Ephemeral Onboarding View
-# -----------------------------------------------------------------------------
-
-
-class EphemeralRegionSelect(ui.Select):
-    """Region select for ephemeral use."""
-
-    def __init__(self):
-        options = [
-            discord.SelectOption(label=REGIONS[code], value=code)
-            for code in REGION_CODES
-        ]
-        super().__init__(
-            placeholder="🌍 Select your region...",
-            options=options,
-            row=0,
+        embed = create_embed(
+            "Player Onboarding", "Select your region and rank, then press Submit."
         )
+        embed.add_field(name="Region", value="Used for matchmaking", inline=True)
+        embed.add_field(name="Rank", value="Used for tournament seeding", inline=True)
 
-    async def callback(self, interaction: discord.Interaction):
-        view: EphemeralOnboardingView = self.view
-        view.selected_region = self.values[0]
-        view._update_confirm_button()
-        await interaction.response.edit_message(view=view)
+        view = OnboardingSessionView(bot, user_id)
 
-
-class EphemeralRankSelect(ui.Select):
-    """Rank select for ephemeral use."""
-
-    def __init__(self):
-        options = [
-            discord.SelectOption(label=name, value=name, emoji=emoji)
-            for name, emoji in RANKS
-        ]
-        super().__init__(
-            placeholder="🎮 Select your current rank...",
-            options=options,
-            row=1,
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-        view: EphemeralOnboardingView = self.view
-        view.selected_rank = self.values[0]
-        view._update_confirm_button()
-        await interaction.response.edit_message(view=view)
-
-
-class EphemeralOnboardingView(ui.View):
-    """Ephemeral onboarding view for /onboard command."""
-
-    def __init__(self, bot: commands.Bot, user_id: int):
-        super().__init__(timeout=300)  # 5 minute timeout
-        self.bot = bot
-        self.user_id = user_id
-        self.selected_region: Optional[str] = None
-        self.selected_rank: Optional[str] = None
-
-        self.add_item(EphemeralRegionSelect())
-        self.add_item(EphemeralRankSelect())
-
-    def _update_confirm_button(self):
-        """Enable confirm when both selected."""
-        self.confirm_button.disabled = not (self.selected_region and self.selected_rank)
-
-    @ui.button(
-        label="✅ Complete Onboarding",
-        style=discord.ButtonStyle.success,
-        disabled=True,
-        row=2,
-    )
-    async def confirm_button(self, interaction: discord.Interaction, button: ui.Button):
-        """Handle confirmation."""
-        if interaction.user.id != self.user_id:
-            return await interaction.response.send_message(
-                "❌ This is not your onboarding session.",
-                ephemeral=True,
-            )
-
-        if not self.selected_region or not self.selected_rank:
-            return await interaction.response.send_message(
-                "❌ Please select both region and rank.",
-                ephemeral=True,
-            )
-
-        await interaction.response.defer(ephemeral=True)
-
-        # Complete onboarding
-        success = await self.bot.player_service.complete_onboarding(
-            discord_id=self.user_id,
-            region=self.selected_region,
-            claimed_rank=self.selected_rank,
-            display_name=interaction.user.display_name,
-        )
-
-        if not success:
-            return await interaction.followup.send(
-                "❌ Failed to save. Please try again.",
-                ephemeral=True,
-            )
-
-        # Disable view
-        for item in self.children:
-            item.disabled = True
-        await interaction.edit_original_response(view=self)
-
-        region_display = REGIONS.get(self.selected_region, self.selected_region)
-        await interaction.followup.send(
-            f"✅ **Welcome aboard!**\n\n"
-            f"🌍 **Region**: {region_display}\n"
-            f"🎮 **Starting Rank**: {self.selected_rank}\n\n"
-            f"You're all set!",
+        await interaction.response.send_message(
+            embed=embed,
+            view=view,
             ephemeral=True,
         )
-
-    async def on_timeout(self):
-        """Handle timeout."""
-        for item in self.children:
-            item.disabled = True
 
 
 # -----------------------------------------------------------------------------
@@ -353,7 +287,7 @@ class OnboardingCog(commands.Cog):
     """
     Player onboarding for UMS Bot Core.
 
-    Hero Feature A: Modern Onboarding Panel
+    Hero Feature A: One-Shot Onboarding Panel
     """
 
     def __init__(self, bot: commands.Bot):
@@ -366,18 +300,15 @@ class OnboardingCog(commands.Cog):
 
     def _create_panel_embed(self) -> discord.Embed:
         """Create onboarding panel embed."""
-        embed = discord.Embed(
-            title="🎮 Player Onboarding",
-            description=(
-                "**Welcome to the tournament system!**\n\n"
-                "Set up your profile to get started:\n"
-                "• 🌍 Select your **region** for fair matchmaking\n"
-                "• 🎮 Set your **starting rank** for seeding\n\n"
-                "This ensures balanced tournaments and fair matches!"
-            ),
-            color=discord.Color.blue(),
+        embed = create_embed(
+            "Player Onboarding", "Set up your profile to join tournaments."
         )
-        embed.set_footer(text="Complete onboarding to join tournaments")
+        embed.add_field(
+            name="Region", value="Select your region for fair matchmaking", inline=False
+        )
+        embed.add_field(
+            name="Rank", value="Set your starting rank for seeding", inline=False
+        )
         return embed
 
     @app_commands.command(
@@ -391,10 +322,11 @@ class OnboardingCog(commands.Cog):
         view = PersistentOnboardingView(self.bot)
 
         await interaction.channel.send(embed=embed, view=view)
-        await interaction.response.send_message(
-            "✅ Onboarding panel posted!",
-            ephemeral=True,
+
+        confirm = success_embed(
+            "Panel Posted", f"Onboarding panel posted in {interaction.channel.mention}"
         )
+        await interaction.response.send_message(embed=confirm, ephemeral=True)
 
         log.info(
             f"[ONBOARDING] Panel posted in #{interaction.channel.name} "
@@ -406,24 +338,39 @@ class OnboardingCog(commands.Cog):
         description="Set up your player profile",
     )
     async def onboard(self, interaction: discord.Interaction):
-        """Send ephemeral onboarding UI."""
-        # Check if already onboarded
+        """Send ephemeral onboarding UI (same logic as button click)."""
+        user_id = interaction.user.id
+
         if hasattr(self.bot, "player_service"):
-            player = await self.bot.player_service.get_by_discord_id(
-                interaction.user.id
-            )
+            player = await self.bot.player_service.get_by_discord_id(user_id)
+
             if player and player.has_onboarded:
-                region_display = REGIONS.get(player.region, player.region or "Not set")
+                region_display = REGIONS.get(player.region, player.region or "Unknown")
+                rank = player.claimed_rank or "Unknown"
+
+                embed = success_embed(
+                    "Already Onboarded", "Your UMS profile is already set up."
+                )
+                embed.add_field(name="Region", value=region_display, inline=True)
+                embed.add_field(name="Rank", value=rank, inline=True)
+                embed.add_field(
+                    name="Need Changes?",
+                    value="Contact a mod/admin to reset your profile.",
+                    inline=False,
+                )
+
                 return await interaction.response.send_message(
-                    f"✅ You've already completed onboarding!\n\n"
-                    f"🌍 **Region**: {region_display}\n"
-                    f"🎮 **Rank**: {player.claimed_rank or 'Not set'}\n\n"
-                    f"You can update your profile by onboarding again.",
+                    embed=embed,
                     ephemeral=True,
                 )
 
-        embed = self._create_panel_embed()
-        view = EphemeralOnboardingView(self.bot, interaction.user.id)
+        embed = create_embed(
+            "Player Onboarding", "Select your region and rank, then press Submit."
+        )
+        embed.add_field(name="Region", value="Used for matchmaking", inline=True)
+        embed.add_field(name="Rank", value="Used for tournament seeding", inline=True)
+
+        view = OnboardingSessionView(self.bot, user_id)
 
         await interaction.response.send_message(
             embed=embed,

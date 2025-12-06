@@ -129,3 +129,42 @@ UMS Bot Core v1.0 is considered "done" when:
 3. All Core pytest suites pass.
 4. Startup logs are clear and understandable for an average admin.
 5. This document and `CORE_RELEASE_CHECKLIST.md` are up to date.
+
+---
+
+## 7. Developer Commands
+
+Developer-only commands prefixed with `ums_dev_` are available only to internal developer IDs and are not intended for server admins. They may change without notice in future versions.
+
+These commands are registered in the codebase but restricted by `DEV_USER_IDS` in the environment. They do not appear in `/ums-help` and are not documented for end users.
+
+---
+
+## 8. Elo / Rating Visibility
+
+Core edition does **not** display Elo or rating values to users.
+
+- Players set a `claimed_rank` during onboarding (e.g., "Gold", "Diamond")
+- This rank is used for tournament seeding
+- Internal Elo calculations exist in the codebase but are not exposed in Core UX
+- Full Elo display and tracking is a Premium feature
+
+---
+
+## 9. Admin UX Standard (Summary)
+
+UMS Bot Core follows a strict interaction model for admin and dev flows. The goals are **safety**, **clarity**, and **consistency** across all future UMS products.
+
+| Category | UX Pattern |
+|----------|------------|
+| Dev tools | Slash commands only |
+| Destructive admin actions | Slash commands only |
+| Tournament actions | Buttons/panels in the Admin Control Panel |
+| Player management | Slash-first, optional panel access |
+
+**Key Principles:**
+- No destructive action can be triggered by a single click
+- Panels may reference slash commands but never execute destructive actions
+- All admin actions are logged and auditable
+
+For the full specification, see: [`ADMIN_UX_STANDARD.md`](./ADMIN_UX_STANDARD.md)

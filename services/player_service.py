@@ -189,6 +189,35 @@ class PlayerService:
         player = await self.get_by_discord_id(discord_id)
         return player is not None and player.has_onboarded == 1
 
+    async def reset_onboarding(self, discord_id: int) -> bool:
+        """
+        Reset player onboarding status.
+
+        Clears region, rank, and has_onboarded flag so player can re-onboard.
+        Used by admin reset tool.
+        """
+        try:
+            now = int(time.time())
+            await self.db.execute(
+                """
+                UPDATE players SET
+                    region = NULL,
+                    claimed_rank = NULL,
+                    has_onboarded = 0,
+                    updated_at = ?
+                WHERE discord_id = ?
+                """,
+                (now, discord_id),
+            )
+            await self.db.commit()
+
+            log.info(f"[PLAYER-SERVICE] Reset onboarding for: {discord_id}")
+            return True
+
+        except Exception as e:
+            log.error(f"[PLAYER-SERVICE] Reset onboarding failed: {e}")
+            return False
+
     async def get_all_players(self, limit: int = 100) -> list[Player]:
         """Get all players (limited)."""
         try:

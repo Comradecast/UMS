@@ -4,12 +4,12 @@ core-bot/bot.py — UMS Bot Core Entry Point
 Hardened startup sequence with pre-flight checks,
 lockfile handling, and clean shutdown.
 
-UMS Core v1.0.0-core - 3 Hero Features Only:
-1. Onboarding Panel
-2. Admin Setup Panel
-3. Tournament Request Flow (approval-required)
+UMS Core v1.0.0-core - Core Features:
+1. Onboarding Panel (one-shot player registration)
+2. Admin Setup Panel (server configuration)
+3. Single Elimination Tournaments (direct creation)
 
-EXCLUDES: Live brackets, Elo/ratings, clans, teams, queues
+EXCLUDES: Queues, double-elim, Elo display, clans, teams, requests
 """
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ from database import (
     validate_db_connectivity,
     validate_schema,
 )
+from core_version import CORE_VERSION
 
 # -----------------------------------------------------------------------------
 # Configuration
@@ -72,12 +73,12 @@ intents.message_content = False
 
 class CoreBot(commands.Bot):
     """
-    UMS Bot Core - Minimal tournament bot with 3 hero features.
+    UMS Bot Core - Minimal tournament bot.
 
     Features:
-    - Onboarding Panel (player registration)
+    - Onboarding Panel (one-shot player registration)
     - Admin Setup Panel (server configuration)
-    - Tournament Request Flow (approval-required workflow)
+    - Single Elimination Tournaments (direct creation, no approval flow)
     """
 
     def __init__(self):
@@ -92,7 +93,7 @@ class CoreBot(commands.Bot):
         Fails fast with clear errors if anything is missing.
         """
         print("\n" + "=" * 60)
-        print(">> UMS Bot Core — Pre-flight Checks (v1.0.0-core)")
+        print(f">> UMS Bot Core — Pre-flight Checks (v{CORE_VERSION})")
         print("=" * 60)
 
         # 1. Validate DISCORD_TOKEN

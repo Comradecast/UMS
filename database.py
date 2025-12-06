@@ -1,17 +1,24 @@
 """
 core-bot/database.py — UMS Bot Core Database Module
 -----------------------------------------------------
-Provides DB initialization with v3 schema for UMS Core only.
+Provides DB initialization with v3 schema for UMS Core.
 
-UMS Core Tables:
+CORE TABLES (actively used by UMS Bot Core):
 - meta: Schema version tracking
-- players: Player identity and basic info (minimal fields for core)
+- players: Player identity and onboarding data (minimal fields)
 - guild_config: Server configuration (v3 source of truth)
-- tournament_requests: Request tracking with approval workflow
-- tournaments: Minimal tournament records
+- tournaments: Single Elimination tournament records
+- tournament_entries: Player registrations
+- matches: SE bracket matches
 
-Legacy/Compatibility:
-- server_configs: Read-only fallback, migrates to guild_config on first use
+SCHEMA ALIGNMENT TABLES (exist for compatibility, not used by Core):
+- tournament_requests: Request/approval workflow (Premium feature)
+- server_configs: Legacy config (read-only fallback)
+- organizer_cooldowns: Organizer rate limiting (Premium feature)
+- organizer_bans: Organizer ban tracking (Premium feature)
+
+NOTE: Elo/rating fields exist in the full UMS players table but are NOT
+displayed in Core UX. Core uses claimed_rank for seeding only.
 """
 
 from __future__ import annotations
@@ -132,6 +139,9 @@ async def init_db(db_path: Optional[str] = None) -> None:
 
         # ------------------------------------------------------------------
         # TOURNAMENT_REQUESTS - Request tracking with approval workflow
+        # NOTE: Core edition does NOT use this table.
+        # It exists for schema alignment with the full UMS Bot (Premium).
+        # Core uses direct tournament creation via /tournament_create.
         # ------------------------------------------------------------------
         await db.execute(
             """
@@ -277,6 +287,8 @@ async def init_db(db_path: Optional[str] = None) -> None:
 
         # ------------------------------------------------------------------
         # ORGANIZER RATE LIMITING
+        # NOTE: Core edition does NOT use these tables.
+        # They exist for schema alignment with the full UMS Bot (Premium).
         # ------------------------------------------------------------------
         await db.execute(
             """
