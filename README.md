@@ -213,9 +213,16 @@ core-bot/
 
 ---
 
-## 📄 License
+## 🧾 License & Future Premium Features
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+UMS Bot Core is open source and released under the [MIT License](LICENSE).
+
+Core will always remain:
+- Free to use
+- Self-hostable
+- Minimal and stable
+
+Future **UMS Premium** features (such as Solo Queue, Elo, advanced stats, clans, and automation) will be developed as separate, closed-source components and/or hosted services that build on top of Core.
 
 ---
 
