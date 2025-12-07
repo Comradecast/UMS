@@ -1,3 +1,5 @@
+# This block will create a text file containing the raw README with zero formatting interpretation.
+content = r"""
 # UMS Bot Core
 
 **Minimal. Stable. Production-Ready.**
@@ -40,7 +42,6 @@ Perfect for small/medium communities that want reliable tournament operations wi
 
 **Requirements:** Python 3.11+
 
-```bash
 git clone https://github.com/Comradecast/UMS.git
 cd UMS/core-bot
 python -m venv venv
@@ -52,9 +53,8 @@ cp .env.example .env
 # Edit .env → DISCORD_TOKEN=your_token_here
 
 python bot.py
-```
 
-Then run `/setup` in your Discord server.
+Then run /setup in your Discord server.
 
 ---
 
@@ -70,47 +70,49 @@ UMS Core supports an optional connection to **UMS Premium Service** for advanced
 ### Setup
 
 1. Start the Premium backend:
-   ```bash
+
 cd path/to/ums-premium-service
-.\venv\Scripts\Activate.ps1      # Windows
-# source venv/bin/activate       # Linux/Mac
+.\venv\Scripts\activate    # Windows
+# source venv/bin/activate # Linux/Mac
 uvicorn main:app --reload --port 8000
-   ```
 
-2. Add to your core-bot `.env`:
-   ```
-   PREMIUM_ENABLED=1
-   PREMIUM_API_URL=http://localhost:8000
-   PREMIUM_API_KEY=your-secret-key
-   ```
+2. Add to your core-bot/.env:
 
-3. Start core-bot — Premium will auto-load
+PREMIUM_ENABLED=1
+PREMIUM_API_URL=http://localhost:8000
+PREMIUM_API_KEY=your-secret-key
 
-4. Run `/premium_post_solo_panel` in Discord
+3. Start core-bot — Premium will auto-load.
+
+4. Run /premium_post_solo_panel in Discord.
 
 ### Premium Commands
-| Command | Description |
-|---------|-------------|
-| `/premium_post_solo_panel` | Post Solo Queue panel (admin) |
-| `/premium_matchmaking_tick` | Manual matchmaking (admin) |
+
+/premium_post_solo_panel     Post Solo Queue panel (admin)
+/premium_matchmaking_tick    Manual matchmaking (admin)
 
 ---
 
 ## Documentation
 
-👉 **[Full Documentation](docs/UMS_README.md)**
+👉 Full Documentation: docs/UMS_README.md
 
 ---
 
 ## License
 
-MIT License — see [LICENSE](LICENSE)
+MIT License — see LICENSE
 
 ---
 
-<div align="center">
+Invite Bot:
+https://discord.com/oauth2/authorize?client_id=1446358626066501703&permissions=2147559440&integration_type=0&scope=bot+applications.commands
 
-[Invite Bot](https://discord.com/oauth2/authorize?client_id=1446358626066501703&permissions=2147559440&integration_type=0&scope=bot+applications.commands) •
-[Report Bug](https://github.com/Comradecast/UMS/issues)
+Report Bug:
+https://github.com/Comradecast/UMS/issues
+"""
 
-</div>
+with open("/mnt/data/UMS_README_RAW.txt", "w", encoding="utf-8") as f:
+    f.write(content)
+
+"/mnt/data/UMS_README_RAW.txt"
