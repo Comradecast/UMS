@@ -40,6 +40,7 @@ Perfect for small/medium communities that want reliable tournament operations wi
 
 **Requirements:** Python 3.11+
 
+```bash
 git clone https://github.com/Comradecast/UMS.git
 cd UMS/core-bot
 python -m venv venv
@@ -51,8 +52,9 @@ cp .env.example .env
 # Edit .env → DISCORD_TOKEN=your_token_here
 
 python bot.py
+```
 
-Then run /setup in your Discord server.
+Then run `/setup` in your Discord server.
 
 ---
 
@@ -69,48 +71,47 @@ UMS Core supports an optional connection to **UMS Premium Service** for advanced
 
 1. Start the Premium backend:
 
+```bash
 cd path/to/ums-premium-service
 .\venv\Scripts\activate    # Windows
 # source venv/bin/activate # Linux/Mac
 uvicorn main:app --reload --port 8000
+   ```
 
-2. Add to your core-bot/.env:
+2. Add to your core-bot `.env`:
+   ```
+   PREMIUM_ENABLED=1
+   PREMIUM_API_URL=http://localhost:8000
+   PREMIUM_API_KEY=your-secret-key
+   ```
 
-PREMIUM_ENABLED=1
-PREMIUM_API_URL=http://localhost:8000
-PREMIUM_API_KEY=your-secret-key
+3. Start core-bot — Premium will auto-load
 
-3. Start core-bot — Premium will auto-load.
-
-4. Run /premium_post_solo_panel in Discord.
+4. Run `/premium_post_solo_panel` in Discord
 
 ### Premium Commands
-
-/premium_post_solo_panel     Post Solo Queue panel (admin)
-/premium_matchmaking_tick    Manual matchmaking (admin)
+| Command | Description |
+|---------|-------------|
+| `/premium_post_solo_panel` | Post Solo Queue panel (admin) |
+| `/premium_matchmaking_tick` | Manual matchmaking (admin) |
 
 ---
 
 ## Documentation
 
-👉 Full Documentation: docs/UMS_README.md
+👉 **[Full Documentation](docs/UMS_README.md)**
 
 ---
 
 ## License
 
-MIT License — see LICENSE
+MIT License — see [LICENSE](LICENSE)
 
 ---
 
-Invite Bot:
-https://discord.com/oauth2/authorize?client_id=1446358626066501703&permissions=2147559440&integration_type=0&scope=bot+applications.commands
+<div align="center">
 
-Report Bug:
-https://github.com/Comradecast/UMS/issues
-"""
+[Invite Bot](https://discord.com/oauth2/authorize?client_id=1446358626066501703&permissions=2147559440&integration_type=0&scope=bot+applications.commands) •
+[Report Bug](https://github.com/Comradecast/UMS/issues)
 
-with open("/mnt/data/UMS_README_RAW.txt", "w", encoding="utf-8") as f:
-    f.write(content)
-
-"/mnt/data/UMS_README_RAW.txt"
+</div>
