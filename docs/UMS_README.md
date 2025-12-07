@@ -178,13 +178,13 @@ Recommended permissions:
 
 | Document | Description |
 |----------|-------------|
-| [Architecture](docs/ARCHITECTURE_NOW.md) | Current system architecture |
-| [Admin UX Standard](docs/ADMIN_UX_STANDARD.md) | UX rules and patterns |
-| [Product Spec](docs/CORE_PRODUCT_SPEC.md) | Feature specification |
-| [Dev Tools Reference](docs/DEV_TOOLS_REFERENCE.md) | Developer tool docs |
-| [Release Notes](docs/RELEASE_NOTES_v1.0.0.md) | v1.0.0-core changelog |
-| [Privacy Policy](docs/PRIVACY_POLICY.md) | Data handling policy |
-| [Terms of Service](docs/TERMS_OF_SERVICE.md) | Usage terms |
+| [Architecture](ARCHITECTURE_NOW.md) | Current system architecture |
+| [Admin UX Standard](ADMIN_UX_STANDARD.md) | UX rules and patterns |
+| [Product Spec](CORE_PRODUCT_SPEC.md) | Feature specification |
+| [Dev Tools Reference](DEV_TOOLS_REFERENCE.md) | Developer tool docs |
+| [Release Notes](RELEASE_NOTES_v1.0.0.md) | v1.0.0-core changelog |
+| [Privacy Policy](PRIVACY_POLICY.md) | Data handling policy |
+| [Terms of Service](TERMS_OF_SERVICE.md) | Usage terms |
 
 ---
 
