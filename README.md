@@ -1,5 +1,3 @@
-# This block will create a text file containing the raw README with zero formatting interpretation.
-content = r"""
 # UMS Bot Core
 
 **Minimal. Stable. Production-Ready.**
