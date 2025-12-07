@@ -47,7 +47,7 @@ Users may request deletion of their data through the server owner hosting the Bo
 
 ## 6. Contact
 For questions or concerns, please open an issue on the GitHub repository:
-https://github.com/Comradecast/tournament-bot
+https://github.com/Comradecast/UMS
 
 ---
 

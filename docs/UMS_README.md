@@ -145,6 +145,7 @@ Recommended permissions:
 | Command | Description |
 |---------|-------------|
 | `/onboard` | Set up your player profile |
+| `/dashboard` | View your current tournament status |
 
 ### Admin Commands
 

@@ -81,8 +81,8 @@ Tests cover:
 ## 🚀 Getting Started
 
 ```bash
-git clone https://github.com/Comradecast/tournament-bot.git
-cd tournament-bot/core-bot
+git clone https://github.com/Comradecast/UMS.git
+cd UMS
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt

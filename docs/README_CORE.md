@@ -25,14 +25,14 @@ These belong in the full UMS Bot or Premium tiers.
 ## Running Core Locally
 
 ```bash
-git clone https://github.com/Comradecast/tournament-bot.git
-cd tournament-bot
+git clone https://github.com/Comradecast/UMS.git
+cd UMS
 python -m venv venv
 venv\Scripts\activate  # on Windows (or source venv/bin/activate on Linux/Mac)
-pip install -r requirements-all.txt
+pip install -r requirements.txt
 
 # Set DISCORD_TOKEN in a .env file or your environment
-python core-bot\bot.py
+python bot.py
 ```
 
 ## Quick Start (Once Online)

@@ -60,7 +60,7 @@ In a fresh guild:
 
 ### 3. Tournament Lifecycle
 
-- [ ] Use Tournament Request flow to create a Single Elimination tournament
+- [ ] Use `/tournament_create` to create a Single Elimination tournament
 - [ ] Tournament row created with:
   - [ ] `tournament_code` set
   - [ ] Guild and channel references populated

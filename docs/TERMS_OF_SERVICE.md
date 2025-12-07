@@ -45,4 +45,4 @@ Server owners can remove the Bot at any time by kicking it or deleting local dat
 
 ## 6. Contact
 For questions or support, please open an Issue on GitHub:
-https://github.com/Comradecast/tournament-bot
+https://github.com/Comradecast/UMS
