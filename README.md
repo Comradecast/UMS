@@ -71,9 +71,10 @@ UMS Core supports an optional connection to **UMS Premium Service** for advanced
 
 1. Start the Premium backend:
    ```bash
-   cd "C:\Users\lwpar\CascadeProjects\UMS Premium Service"
-   .\venv\Scripts\Activate.ps1
-   uvicorn main:app --reload --port 8000
+cd path/to/ums-premium-service
+.\venv\Scripts\Activate.ps1      # Windows
+# source venv/bin/activate       # Linux/Mac
+uvicorn main:app --reload --port 8000
    ```
 
 2. Add to your core-bot `.env`:
