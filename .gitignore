@@ -1,6 +1,7 @@
 # Environment & local data
 core-bot/.env
 core-bot/tournament_bot_core.db
+core-bot/venv/
 
 # Python caches
 __pycache__/
