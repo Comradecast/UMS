@@ -5,9 +5,32 @@ All notable changes to UMS Bot Core will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0-core] - 2025-12-06
+## [1.1.0-core] - 2025-12-06
 
 ### Added
+- **Premium Integration** — Optional connection to UMS Premium Service backend
+  - `premium_cogs/premium_client.py` — Async HTTP client for Premium API
+  - `premium_cogs/solo_queue_ui.py` — Premium Solo Queue panel and match UI
+  - `config/premium_config.py` — Environment-based configuration
+- **Premium Solo Queue**:
+  - `/premium_post_solo_panel` — Post ranked queue panel (admin)
+  - `/premium_matchmaking_tick` — Manual matchmaking trigger (admin/dev)
+  - Join 1v1/2v2 Ranked buttons
+  - My Status button for queue position and Elo ratings
+  - Match result buttons (I Won / Opponent Won / Cancel)
+- Environment variables for Premium:
+  - `PREMIUM_ENABLED` — Toggle Premium features (default: 0)
+  - `PREMIUM_API_URL` — Backend URL (e.g., http://localhost:8000)
+  - `PREMIUM_API_KEY` — Shared secret for authentication
+- Dependency: `aiohttp>=3.9.0` for Premium HTTP client
+
+### Changed
+- Bot startup now includes optional Premium phase
+- Shutdown gracefully closes Premium client session
+
+---
+
+## [1.0.0-core] - 2025-12-06
 - **UMS Bot Core** — Minimal, stable edition of Unified Match System
 - **Server Setup**:
   - `/setup` — Quick Setup wizard with channel creation

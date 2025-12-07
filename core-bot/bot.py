@@ -8,8 +8,9 @@ UMS Core v1.0.0-core - Core Features:
 1. Onboarding Panel (one-shot player registration)
 2. Admin Setup Panel (server configuration)
 3. Single Elimination Tournaments (direct creation)
+4. Premium Solo Queue (via external UMS Premium Service - optional)
 
-EXCLUDES: Queues, double-elim, Elo display, clans, teams, requests
+EXCLUDES: Double-elim, clans, teams, requests
 """
 
 from __future__ import annotations
@@ -41,6 +42,7 @@ from database import (
     validate_schema,
 )
 from core_version import CORE_VERSION
+from config.premium_config import get_premium_config
 
 # -----------------------------------------------------------------------------
 # Configuration
@@ -84,6 +86,8 @@ class CoreBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix="!", intents=intents)
         self.db: Optional[aiosqlite.Connection] = None
+        self.premium_client = None  # Set if Premium is enabled
+        self._premium_session = None  # aiohttp session for Premium
         self._startup_complete = False
 
     async def run_startup_checks(self) -> None:
@@ -182,6 +186,11 @@ class CoreBot(commands.Bot):
         phase5_elapsed = time.perf_counter() - phase5_start
         print(f"[5/5] Command sync .................... OK ({phase5_elapsed:.2f}s)")
 
+        # Phase 5.5 (optional): Load Premium
+        phase55_start = time.perf_counter()
+        await self._load_premium()
+        phase55_elapsed = time.perf_counter() - phase55_start
+
         print("-" * 60)
         total = (
             phase1_elapsed
@@ -189,6 +198,7 @@ class CoreBot(commands.Bot):
             + phase3_elapsed
             + phase4_elapsed
             + phase5_elapsed
+            + phase55_elapsed
         )
         print(f"[+] Startup complete in {total:.2f}s")
         print("-" * 60)
@@ -239,6 +249,54 @@ class CoreBot(commands.Bot):
         if failed:
             log.warning(f"Failed cogs: {', '.join(failed)}")
 
+    async def _load_premium(self):
+        """
+        Load Premium integration if enabled.
+
+        Creates PremiumClient and loads Premium cogs.
+        """
+        import aiohttp
+        from premium_cogs.premium_client import PremiumClient
+
+        premium_config = get_premium_config()
+
+        if not premium_config.enabled:
+            log.info("Premium disabled; skipping Premium cogs")
+            return
+
+        if not premium_config.api_url:
+            log.warning("PREMIUM_API_URL not set; skipping Premium cogs")
+            return
+
+        if not premium_config.api_key:
+            log.warning("PREMIUM_API_KEY not set; skipping Premium cogs")
+            return
+
+        try:
+            # Create shared aiohttp session
+            self._premium_session = aiohttp.ClientSession()
+
+            # Create Premium client
+            self.premium_client = PremiumClient(
+                base_url=premium_config.api_url,
+                api_key=premium_config.api_key,
+                session=self._premium_session,
+            )
+
+            # Load Premium cogs
+            await self.load_extension("premium_cogs.solo_queue_ui")
+            log.info(f"Premium enabled: {premium_config.api_url}")
+            print("    Premium Solo Queue .............. OK")
+
+        except Exception as e:
+            log.error(f"Failed to load Premium: {e}", exc_info=True)
+            print(f"    Premium Solo Queue .............. FAILED: {e}")
+            # Clean up on failure
+            if self._premium_session:
+                await self._premium_session.close()
+                self._premium_session = None
+            self.premium_client = None
+
 
 bot = CoreBot()
 
@@ -266,6 +324,21 @@ async def on_ready():
 async def shutdown():
     """Graceful shutdown."""
     log.info("Shutdown: starting graceful shutdown")
+
+    # Close Premium client if active
+    if getattr(bot, "premium_client", None):
+        try:
+            await bot.premium_client.close()
+            log.info("Shutdown: Premium client closed")
+        except Exception:
+            log.exception("Error closing Premium client")
+
+    if getattr(bot, "_premium_session", None):
+        try:
+            await bot._premium_session.close()
+            log.info("Shutdown: Premium session closed")
+        except Exception:
+            log.exception("Error closing Premium session")
 
     if getattr(bot, "db", None):
         try:

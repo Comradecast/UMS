@@ -58,6 +58,43 @@ Then run `/setup` in your Discord server.
 
 ---
 
+## Premium Integration (Optional)
+
+UMS Core supports an optional connection to **UMS Premium Service** for advanced Solo Queue features.
+
+### What Premium Adds
+- ⚔️ Ranked Solo Queue with Elo-based matchmaking
+- 📈 Per-mode ratings (1v1, 2v2, 3v3)
+- 📊 Match history and rating tracking
+
+### Setup
+
+1. Start the Premium backend:
+   ```bash
+   cd "C:\Users\lwpar\CascadeProjects\UMS Premium Service"
+   .\venv\Scripts\Activate.ps1
+   uvicorn main:app --reload --port 8000
+   ```
+
+2. Add to your core-bot `.env`:
+   ```
+   PREMIUM_ENABLED=1
+   PREMIUM_API_URL=http://localhost:8000
+   PREMIUM_API_KEY=your-secret-key
+   ```
+
+3. Start core-bot — Premium will auto-load
+
+4. Run `/premium_post_solo_panel` in Discord
+
+### Premium Commands
+| Command | Description |
+|---------|-------------|
+| `/premium_post_solo_panel` | Post Solo Queue panel (admin) |
+| `/premium_matchmaking_tick` | Manual matchmaking (admin) |
+
+---
+
 ## Documentation
 
 👉 **[Full Documentation](docs/UMS_README.md)**
