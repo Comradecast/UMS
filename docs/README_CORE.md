@@ -26,7 +26,7 @@ These belong in the full UMS Bot or Premium tiers.
 
 ```bash
 git clone https://github.com/Comradecast/UMS.git
-cd UMS
+cd UMS/core-bot
 python -m venv venv
 venv\Scripts\activate  # on Windows (or source venv/bin/activate on Linux/Mac)
 pip install -r requirements.txt
@@ -74,17 +74,18 @@ python bot.py
 ## Project Structure
 
 ```
-core-bot/
-├── bot.py              # Main entry point
-├── database.py         # DB init + migrations
-├── core_version.py     # Version constant
-├── cogs/               # Discord command layer
-├── services/           # Business logic
-├── ui/                 # Views, embeds, brand kit
-├── config/             # Configuration
-├── migrations/         # DB migrations
-├── docs/               # Documentation
-└── tests/              # Test suite
+UMS/
+├── docs/               # Documentation (at repo root)
+├── core-bot/           # Bot code
+│   ├── bot.py          # Main entry point
+│   ├── database.py     # DB init + migrations
+│   ├── cogs/           # Discord command layer
+│   ├── services/       # Business logic
+│   ├── ui/             # Views, embeds, brand kit
+│   └── tests/          # Test suite
+├── README.md
+├── LICENSE
+└── CONTRIBUTING.md
 ```
 
 ## Documentation

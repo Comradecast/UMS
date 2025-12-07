@@ -82,9 +82,10 @@ Tests cover:
 
 ```bash
 git clone https://github.com/Comradecast/UMS.git
-cd UMS
+cd UMS/core-bot
 python -m venv venv
-venv\Scripts\activate
+venv\Scripts\activate  # Windows
+# source venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 
 # Set DISCORD_TOKEN in .env

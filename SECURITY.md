@@ -10,7 +10,7 @@ UMS Bot Core is a Discord bot that handles user data (Discord IDs, usernames, to
    Use GitHub's private security advisory feature if available.
 
 2. **Email**  
-   Send details to: security@ums-bot.example
+   Open an issue on GitHub: https://github.com/Comradecast/UMS/issues
 
 ### What to Include
 

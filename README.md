@@ -42,9 +42,10 @@ Perfect for small/medium communities that want reliable tournament operations wi
 
 ```bash
 git clone https://github.com/Comradecast/UMS.git
-cd UMS
+cd UMS/core-bot
 python -m venv venv
 venv\Scripts\activate  # Windows
+# source venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 
 cp .env.example .env

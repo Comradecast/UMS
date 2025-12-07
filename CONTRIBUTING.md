@@ -5,13 +5,15 @@ Thanks for your interest in contributing! UMS Bot Core is intentionally minimal 
 ## Project Layout
 
 ```
-core-bot/
-├── bot.py              # Entry point
-├── cogs/               # Feature modules (commands)
-├── services/           # Business logic layer
-├── ui/                 # Views, embeds, dashboards
-├── docs/               # Documentation
-└── tests/              # Test suite
+UMS/
+├── docs/               # Documentation (at repo root)
+├── core-bot/
+│   ├── bot.py          # Entry point
+│   ├── cogs/           # Feature modules (commands)
+│   ├── services/       # Business logic layer
+│   ├── ui/             # Views, embeds, dashboards
+│   └── tests/          # Test suite
+└── README.md, LICENSE, etc.
 ```
 
 ## Getting Started
@@ -19,7 +21,7 @@ core-bot/
 1. **Fork & Clone**
    ```bash
    git clone https://github.com/YOUR_USERNAME/UMS.git
-   cd UMS
+   cd UMS/core-bot
    ```
 
 2. **Create Virtual Environment**

@@ -83,7 +83,7 @@ Perfect for:
 
 ```bash
 git clone https://github.com/Comradecast/UMS.git
-cd UMS
+cd UMS/core-bot
 ```
 
 ### 2. Create a Virtual Environment
@@ -226,25 +226,25 @@ python -m pytest tests/test_core.py -v
 
 ```
 UMS/
-├── bot.py                  # Entry point
-├── database.py             # Schema + migrations
-├── core_version.py         # Version constant
-├── constants.py            # Shared constants
-├── cogs/                   # Discord command handlers
-│   ├── server_setup.py     # Setup flows
-│   ├── onboarding_view.py  # Player onboarding
-│   ├── tournaments.py      # Tournament management
-│   ├── announcements.py    # Announcement wizard
-│   ├── registration.py     # Registration logic
-│   ├── brackets.py         # Bracket display
-│   └── ...
-├── services/               # Business logic layer
-├── ui/                     # Views, embeds, brand kit
-├── docs/                   # Documentation
-├── tests/                  # Test suite
-├── assets/                 # Branding assets
-├── requirements.txt        # Dependencies
-└── LICENSE                 # MIT License
+├── docs/                   # Documentation (at repo root)
+├── core-bot/               # Bot code
+│   ├── bot.py              # Entry point
+│   ├── database.py         # Schema + migrations
+│   ├── core_version.py     # Version constant
+│   ├── constants.py        # Shared constants
+│   ├── cogs/               # Discord command handlers
+│   │   ├── server_setup.py
+│   │   ├── onboarding_view.py
+│   │   ├── tournaments.py
+│   │   └── ...
+│   ├── services/           # Business logic layer
+│   ├── ui/                 # Views, embeds, brand kit
+│   ├── tests/              # Test suite
+│   ├── assets/             # Branding assets
+│   └── requirements.txt    # Dependencies
+├── README.md
+├── LICENSE
+└── CONTRIBUTING.md
 ```
 
 ### Contributing
@@ -255,7 +255,7 @@ UMS/
 4. Run tests: `pytest`
 5. Open a Pull Request
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
 
 ---
 

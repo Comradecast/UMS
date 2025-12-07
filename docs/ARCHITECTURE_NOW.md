@@ -145,28 +145,29 @@ Core uses SQLite with shared schema (compatible with full UMS Bot):
 ## File Structure
 
 ```
-core-bot/
-├── bot.py                  # Entry point
-├── database.py             # Schema + migrations
-├── core_version.py         # Version constant
-├── cogs/
-│   ├── server_setup.py     # Setup flows
-│   ├── onboarding_view.py  # Player onboarding
-│   └── tournaments.py      # Tournament management
-├── services/
-│   ├── tournament_service.py
-│   ├── player_service.py
-│   ├── guild_config_service.py
-│   └── rating_service.py
-├── ui/
-│   ├── brand.py            # Brand constants
-│   ├── tournament_views.py # Views + embeds
-│   ├── registration_views.py
-│   └── match_views.py
-└── docs/
-    ├── ARCHITECTURE_NOW.md  # This file
-    ├── ADMIN_UX_STANDARD.md # UX rules
-    └── CORE_PRODUCT_SPEC.md # Product spec
+UMS/
+├── docs/                       # Documentation (at repo root)
+│   ├── ARCHITECTURE_NOW.md     # This file
+│   ├── ADMIN_UX_STANDARD.md    # UX rules
+│   └── CORE_PRODUCT_SPEC.md    # Product spec
+├── core-bot/                   # Bot code
+│   ├── bot.py                  # Entry point
+│   ├── database.py             # Schema + migrations
+│   ├── core_version.py         # Version constant
+│   ├── cogs/
+│   │   ├── server_setup.py     # Setup flows
+│   │   ├── onboarding_view.py  # Player onboarding
+│   │   └── tournaments.py      # Tournament management
+│   ├── services/
+│   │   ├── tournament_service.py
+│   │   ├── player_service.py
+│   │   └── guild_config_service.py
+│   └── ui/
+│       ├── brand.py            # Brand constants
+│       └── tournament_views.py # Views + embeds
+├── README.md
+├── LICENSE
+└── CONTRIBUTING.md
 ```
 
 ---
