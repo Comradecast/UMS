@@ -177,19 +177,20 @@ class CoreBot(commands.Bot):
                 except Exception as e:
                     log.error(f"Error in {cog.__class__.__name__}.async_init(): {e}")
         phase4_elapsed = time.perf_counter() - phase4_start
-        print(f"[4/5] Cog initialization .............. OK ({phase4_elapsed:.2f}s)")
+        print(f"[4/6] Cog initialization .............. OK ({phase4_elapsed:.2f}s)")
 
-        # Phase 5: Sync commands
+        # Phase 5: Load Premium (BEFORE sync so commands register)
         phase5_start = time.perf_counter()
+        await self._load_premium()
+        phase5_elapsed = time.perf_counter() - phase5_start
+        print(f"[5/6] Premium integration ............. OK ({phase5_elapsed:.2f}s)")
+
+        # Phase 6: Sync commands (includes Premium commands now)
+        phase6_start = time.perf_counter()
         synced = await self.tree.sync()
         log.info(f"Synced {len(synced)} global commands")
-        phase5_elapsed = time.perf_counter() - phase5_start
-        print(f"[5/5] Command sync .................... OK ({phase5_elapsed:.2f}s)")
-
-        # Phase 5.5 (optional): Load Premium
-        phase55_start = time.perf_counter()
-        await self._load_premium()
-        phase55_elapsed = time.perf_counter() - phase55_start
+        phase6_elapsed = time.perf_counter() - phase6_start
+        print(f"[6/6] Command sync .................... OK ({phase6_elapsed:.2f}s)")
 
         print("-" * 60)
         total = (
@@ -198,7 +199,7 @@ class CoreBot(commands.Bot):
             + phase3_elapsed
             + phase4_elapsed
             + phase5_elapsed
-            + phase55_elapsed
+            + phase6_elapsed
         )
         print(f"[+] Startup complete in {total:.2f}s")
         print("-" * 60)
