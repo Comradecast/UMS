@@ -6,7 +6,7 @@
 
 <div align="center">
 
-  <img src="assets/branding/UMSBotCore.png" alt="UMS Bot Core Mascot" width="120" />
+  <img src="../core-bot/assets/branding/UMSBotCore.png" alt="UMS Bot Core Mascot" width="120" />
 
   # UMS Bot Core
 
